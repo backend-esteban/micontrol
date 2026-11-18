@@ -1,0 +1,16 @@
+MI CONTROL FINANCIERO — instrucciones
+
+INSTALAR EN IPHONE (necesita publicarse una vez por HTTPS, después funciona sin internet)
+1. Sube la carpeta completa a un hosting HTTPS gratuito (GitHub Pages, Netlify Drop, Cloudflare Pages).
+   Los 7 archivos deben estar juntos: index.html, core.js, sw.js, manifest.webmanifest, icon-180.png, icon-512.png.
+2. Abre la dirección en Safari y espera a que cargue completa (así se guarda para uso offline).
+3. Toca Compartir → «Agregar a pantalla de inicio» → Agregar.
+4. Abre la app desde el ícono. Prueba activando modo avión: debe seguir funcionando.
+Nota: abrir index.html como archivo suelto sirve para probar, pero iOS no lo instala ni lo deja offline sin HTTPS.
+
+RESPALDOS
+- Más → Respaldo y ajustes → Exportar respaldo. Guarda el .json en Archivos/iCloud (una vez por semana).
+- Para recuperar o cambiar de teléfono: Importar y elegir el .json. También acepta el respaldo de la versión anterior (Mi Control Uber).
+- Los datos se guardan en IndexedDB del teléfono. Si borras datos del sitio o desinstalas Safari, se pierden: por eso el respaldo.
+
+PRUEBAS: node tests.js  (21 pruebas; incluye que «Pago mamá» dic-2026→may-2027 descuenta 6 meses y 0 desde junio).

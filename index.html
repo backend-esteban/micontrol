@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1b26"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Mi Control">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<title>Mi Control Financiero</title>
+<style>
+:root{--ink:#0e1b26;--amb:#f5a623;--bg:#eceff1;--card:#fff;--tx:#14212b;--mu:#5f6f7c;--ln:#dbe1e6;--gr:#12805c;--rd:#c8372d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+#app{max-width:640px;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 14px 14px}
+h1{font-size:26px;margin:4px 2px 12px;letter-spacing:-.4px}h2{font-size:15px;margin:18px 2px 8px}h3{margin:0 0 10px;font-size:19px}
+.hero{background:var(--ink);color:#fff;border-radius:24px;padding:20px}.hero small{color:#9fb2c1}.hero b{display:block;font-size:40px;letter-spacing:-1px;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px}.c{background:var(--card);border-radius:14px;padding:13px;border:1px solid var(--ln)}
+.c small,.mu{color:var(--mu);font-size:12.5px}.c b{display:block;font-size:19px;margin-top:3px;font-variant-numeric:tabular-nums}
+.pos{color:var(--gr)}.neg{color:var(--rd)}.row{display:flex;gap:8px;margin-top:12px}.row>*{flex:1}
+button{border:0;border-radius:12px;padding:13px;font:600 15px inherit;background:var(--ink);color:#fff}button.sec{background:#e1e7ec;color:var(--ink)}button.amb{background:var(--amb);color:var(--ink)}button.dg{background:#f8e3e1;color:#9b2a21}button.sm{padding:8px 11px;font-size:13px;flex:none}
+label{display:block;font-size:12.5px;color:var(--mu);margin-bottom:9px}input,select{display:block;width:100%;margin-top:4px;padding:12px;border:1px solid #c5ced5;border-radius:10px;font-size:16px;background:#fff;color:var(--tx)}
+.li{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--ln)}.li:last-child{border:0}.li>div:last-child{text-align:right}
+.bar{height:8px;background:#e1e7ec;border-radius:9px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--amb)}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:99px;background:#e1e7ec}.tag.v{background:#fbe0dd;color:#9b2a21}.tag.o{background:#d8f0e6;color:var(--gr)}
+nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);display:flex;border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--mu);padding:11px 2px 9px;font-size:11.5px;border-radius:0}nav button.on{color:var(--ink);box-shadow:inset 0 3px var(--amb)}
+#sh{position:fixed;inset:0;background:#0e1b26aa;display:none;align-items:flex-end;z-index:9}#sh.on{display:flex}.sbox{background:#f7f9fa;width:100%;max-width:640px;margin:auto;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;z-index:20;display:none}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.cal div{padding:8px 0;border-radius:10px;font-size:14px;background:#fff;min-height:48px}.cal .h{background:none;min-height:0;color:var(--mu);font-size:11px}.cal .sel{outline:2px solid var(--ink)}.cal .td{background:#fff3da}
+.dt{display:inline-block;width:6px;height:6px;border-radius:9px;margin:1px}
+</style></head><body>
+<div id="app"></div><nav id="nav"></nav><div id="sh"></div><div id="toast"></div>
+<script src="core.js"></script>
+<script>
+const C=window.Core,$=s=>document.querySelector(s);
+const money=n=>(n<0?'-':'')+'$'+Math.abs(Math.round(n||0)).toLocaleString('es-CL');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();return C.iso(d.getFullYear(),d.getMonth(),d.getDate())};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const CATS=['Deuda bancaria','Tarjeta de crédito','Deuda familiar','Pago a mamá','Aporte en casa','Mensualidad de estudios','Gasto de transporte','Capacitación','Licencia profesional','Meta de ahorro','Otro compromiso'];
+const FREQ=[['mensual','Mensual'],['semanal','Semanal'],['unico','Pago único'],['cuotas','Cuotas mensuales'],['permanente','Permanente (sin término)']];
+const STAT=[['activo','Activo'],['pausado','Pausado'],['finalizado','Finalizado']];
+let S={entries:[],commitments:[],payments:[],goals:[],plan:{},rent:{weekly:0,start:''},opening:0,lastBackup:null},ui={tab:'home',sub:null,cal:C.ymOf(today()),day:today()};
+// ---- Almacenamiento IndexedDB ----
+const DB=new Promise((ok,ko)=>{const r=indexedDB.open('mi-control',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
+const kvGet=async k=>{const db=await DB;return new Promise((ok,ko)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ko(q.error)})};
+const kvSet=async(k,v)=>{const db=await DB;return new Promise((ok,ko)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=ok;t.onerror=()=>ko(t.error)})};
+const save=()=>kvSet('state',JSON.parse(JSON.stringify(S))).catch(()=>toast('No se pudo guardar. Exporta un respaldo.'));
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2600)}
+function fromLegacy(a){return a.map(e=>({id:uid(),date:e.date,source:'Uber',hours:e.hours||0,gross:e.income||0,fuel:e.fuel||0,tolls:0,other:e.other||0,rent:e.rent||0,notes:''}))}
+function normalize(d){const b={entries:[],commitments:[],payments:[],goals:[],plan:{},rent:{weekly:0,start:''},opening:0,lastBackup:null};
+ for(const k of ['entries','commitments','payments','goals'])if(!Array.isArray(d[k]))d[k]=[];return Object.assign(b,d)}
+// ---- Formularios ----
+const inp=(id,l,v='',t='text',x='')=>`<label>${l}<input id="${id}" type="${t}" value="${esc(v)}" ${x}></label>`;
+const nm=(id,l,v='')=>inp(id,l,v,'number','inputmode="numeric" min="0" step="1" placeholder="0"');
+const sel=(id,l,o,v)=>`<label>${l}<select id="${id}">${o.map(([k,t])=>`<option value="${esc(k)}"${k===v?' selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
+const gv=id=>$('#'+id).value,gn=id=>Math.max(0,Math.round(+gv(id)||0));
+function sheet(title,body,ok,lbl='Guardar'){$('#sh').innerHTML=`<div class="sbox"><h3>${title}</h3>${body}<div class="row"><button class="sec" onclick="closeSheet()">${ok?'Cancelar':'Cerrar'}</button>${ok?`<button id="shok">${lbl}</button>`:''}</div></div>`;$('#sh').classList.add('on');
+ if(ok)$('#shok').onclick=async()=>{if(await ok()!==false){closeSheet()}}}
+function closeSheet(){$('#sh').classList.remove('on');$('#sh').innerHTML=''}
+const go=(t,s)=>{ui.tab=t;ui.sub=s||null;render();scrollTo(0,0)};
+// ---- Gráficos ----
+function bars(sets,labels,cols){const W=320,H=110,n=labels.length,mx=Math.max(1,...sets.flat()),gw=W/n,bw=Math.min(20,gw/(sets.length+.5));let s=`<svg viewBox="0 0 ${W} ${H+16}" width="100%">`;
+ labels.forEach((l,i)=>{sets.forEach((d,k)=>{const h=d[i]/mx*H;s+=`<rect x="${i*gw+gw/2-bw*sets.length/2+k*bw}" y="${H-h}" width="${bw-2}" height="${Math.max(h,1.5)}" rx="3" fill="${cols[k]}"/>`});s+=`<text x="${i*gw+gw/2}" y="${H+12}" font-size="9" text-anchor="middle" fill="#5f6f7c">${l}</text>`});return s+'</svg>'}
+const short=ym=>C.MES[+ym.slice(5)-1].slice(0,3);
+// ---- Inicio ----
+function home(){const t=today(),ym=C.ymOf(t),[a,b]=C.monthRange(ym),st=C.stats(S,a,b,t),mc=C.monthCommit(S,ym);
+ const paid=C.sum(S.payments,p=>p.amount),saved=C.sum(S.goals,g=>g.saved),avail=S.opening+C.allNet(S,t)-paid-saved;
+ const debt=C.sum(S.commitments.filter(c=>c.status==='activo'),c=>C.balance(S,c)),nx=C.projection(S,C.addYm(ym,1),t),up=C.upcoming(S,t,30).slice(0,5);
+ const m6=[...Array(6)].map((_,i)=>C.addYm(ym,i-5)),r6=m6.map(m=>{const[x,y]=C.monthRange(m);return C.stats(S,x,y,t)}),ds=C.debtSeries(S,t,ym,12);
+ return `<h1>Mi Control</h1><div class="hero"><small>Dinero disponible</small><b class="${avail<0?'neg':''}" style="${avail<0?'color:#ff8a80':''}">${money(avail)}</b><small>Saldo inicial + ganancia neta − pagos − ahorros</small></div>
+ <h2>${C.ymLabel(ym)}</h2><div class="g"><div class="c"><small>Ingresos del mes</small><b>${money(st.gross)}</b></div><div class="c"><small>Gastos del mes</small><b>${money(st.costs+st.rent)}</b></div>
+ <div class="c"><small>Ganancia neta</small><b class="${st.net<0?'neg':'pos'}">${money(st.net)}</b></div><div class="c"><small>Compromisos del mes</small><b>${money(mc.total)}</b><small>pagado ${money(mc.paid)}</small></div>
+ <div class="c"><small>Deudas pendientes</small><b>${money(debt)}</b></div><div class="c"><small>Ahorros acumulados</small><b>${money(saved)}</b></div></div>
+ <h2>Próximos vencimientos (30 días)</h2><div class="c">${up.length?up.map(u=>`<div class="li"><div>${esc(u.c.name)}<br><span class="mu">${C.fmtDate(u.date)}</span></div><div>${money(u.c.amount)}<br>${u.overdue?'<span class="tag v">vencido</span>':''}</div></div>`).join(''):'<span class="mu">No hay pagos pendientes en los próximos 30 días.</span>'}</div>
+ <h2>Proyección de ${C.ymLabel(C.addYm(ym,1))}</h2><div class="c"><div class="li"><span>Ingreso proyectado</span><b>${money(nx.income)}</b></div><div class="li"><span>Gastos + compromisos</span><b>${money(nx.total)}</b></div><div class="li"><span>Podrías ahorrar</span><b class="${nx.avail<0?'neg':'pos'}">${money(nx.avail)}</b></div></div>
+ <h2>Ingresos y gastos (6 meses)</h2><div class="c">${bars([r6.map(r=>r.gross),r6.map(r=>r.costs+r.rent)],m6.map(short),['#0e1b26','#f5a623'])}<span class="mu">Oscuro: ingresos · Ámbar: gastos</span></div>
+ <h2>Evolución de deudas (12 meses)</h2><div class="c">${bars([ds],ds.map((_,i)=>short(C.addYm(ym,i))),['#c8372d'])}<span class="mu">Saldo pendiente proyectado a fin de cada mes</span></div>`}
+// ---- Ingresos ----
+function ingresos(){const t=today(),d=new Date(t+'T12:00:00'),mon=C.addDays(t,-((d.getDay()+6)%7)),ym=C.ymOf(t),[a,b]=C.monthRange(ym),w=C.stats(S,mon,C.addDays(mon,6),t),m=C.stats(S,a,b,t);
+ const l=[...S.entries].sort((x,y)=>y.date.localeCompare(x.date)).slice(0,60);
+ return `<h1>Ingresos</h1><div class="row" style="margin:0 0 12px"><button class="amb" onclick="editE()">+ Nueva jornada</button><button class="sec" onclick="editRent()">Arriendo fijo</button></div>
+ <div class="g"><div class="c"><small>Ganancia semanal</small><b class="${w.net<0?'neg':'pos'}">${money(w.net)}</b></div><div class="c"><small>Ganancia mensual</small><b class="${m.net<0?'neg':'pos'}">${money(m.net)}</b></div><div class="c"><small>Promedio diario (bruto)</small><b>${money(m.avgDaily)}</b></div><div class="c"><small>Neto por hora (mes)</small><b>${money(m.hourly)}</b></div></div>
+ <p class="mu">Arriendo fijo: ${S.rent.weekly?money(S.rent.weekly)+' por semana, descontado '+money(Math.round(S.rent.weekly/7))+' cada día.':'sin configurar.'}</p>
+ <h2>Jornadas</h2><div class="c">${l.length?l.map(e=>{const n=C.entryNet(S,e);return `<div class="li" onclick="editE('${e.id}')"><div>${C.fmtDate(e.date)} · ${esc(e.source)}<br><span class="mu">${e.hours} h · bruto ${money(e.gross)} · gastos ${money(e.fuel+e.tolls+e.other+(e.rent||0))}</span></div><div><b class="${n<0?'neg':'pos'}">${money(n)}</b><br><span class="mu">${e.hours?money(n/e.hours)+'/h':''}</span></div></div>`}).join(''):'<span class="mu">Aún no registras jornadas. Toca «Nueva jornada».</span>'}</div>`}
+function editE(id){const e=S.entries.find(x=>x.id===id)||{date:today(),source:'Uber',hours:'',gross:'',fuel:'',tolls:'',other:'',rent:'',notes:''};
+ sheet(id?'Editar jornada':'Nueva jornada',inp('ed','Fecha de trabajo',e.date,'date')+inp('es','Fuente (Uber, trabajo dependiente…)',e.source)+inp('eh','Horas trabajadas',e.hours,'number','inputmode="decimal" step=".5"')+nm('eg','Ingreso bruto',e.gross)+nm('ef','Combustible',e.fuel)+nm('et','Peajes',e.tolls)+nm('eo','Otros gastos',e.other)+nm('er','Arriendo de esta jornada (solo si NO usas el fijo)',e.rent)+inp('en','Observaciones',e.notes)+(id?'<button class="dg" onclick="delE(\''+id+'\')">Eliminar jornada</button>':''),()=>{
+  if(!gv('ed'))return toast('Falta la fecha'),false;
+  const n={id:id||uid(),date:gv('ed'),source:gv('es')||'Uber',hours:Math.max(0,+gv('eh')||0),gross:gn('eg'),fuel:gn('ef'),tolls:gn('et'),other:gn('eo'),rent:gn('er'),notes:gv('en')};
+  const i=S.entries.findIndex(x=>x.id===id);if(i>=0)S.entries[i]=n;else S.entries.push(n);save();render();toast('Jornada guardada')})}
+function delE(id){if(confirm('¿Eliminar esta jornada?')){S.entries=S.entries.filter(e=>e.id!==id);save();closeSheet();render()}}
+function editRent(){sheet('Arriendo semanal fijo',nm('rw','Monto semanal del arriendo ($)',S.rent.weekly||'')+inp('rs','Se descuenta desde',S.rent.start||today(),'date')+inp('re','Hasta (vacío = sin término)',S.rent.end||'','date')+'<p class="mu">Se reparte en 7 partes iguales y se descuenta cada día de forma automática; no tienes que anotarlo en cada jornada.</p>',()=>{S.rent={weekly:gn('rw'),start:gv('rs'),end:gv('re')};save();render()})}
+// ---- Compromisos ----
+function deudas(){const t=today(),L=S.commitments.slice().sort((a,b)=>(a.status==='activo'?0:1)-(b.status==='activo'?0:1)||a.name.localeCompare(b.name));
+ return `<h1>Compromisos</h1><button class="amb" style="width:100%" onclick="editC()">+ Nuevo compromiso</button><div style="height:12px"></div>`+(L.length?L.map(c=>{const b=C.balance(S,c),q=C.cuotas(S,c),nx=c.status==='activo'?C.schedule(c,C.addDays(t,400)).filter(d=>d>=t&&!C.paidSet(S,c.id).has(d))[0]:null,tot=c.total||0,pct=b!==null&&tot?Math.min(100,100-b/(c.balance0!=null?Math.max(c.balance0,tot):tot)*100):0;
+  return `<div class="c" style="margin-bottom:10px"><div class="li" style="border:0;padding:0"><div><b style="display:inline;font-size:17px">${esc(c.name)}</b><br><span class="mu">${esc(c.category)} · ${FREQ.find(f=>f[0]===c.freq)[1]}</span></div><div><b style="font-size:17px">${money(c.amount)}</b><br><span class="tag ${c.status==='activo'?'o':''}">${c.status}</span></div></div>
+  <div class="mu" style="margin-top:6px">${C.fmtDate(c.start)}${c.end&&c.freq!=='permanente'?' → '+C.fmtDate(c.end):c.freq==='permanente'?' → sin término':''}${nx?' · próximo pago '+C.fmtDate(nx):''}</div>
+  ${b!==null?`<div class="bar"><i style="width:${pct}%"></i></div><div class="mu">Debes <b>${money(b)}</b>${q?` · ${q.paid} de ${q.of} cuotas pagadas, quedan ${q.left}`:''}</div>`:''}
+  <div class="row"><button class="sm" onclick="payC('${c.id}')">Pagar</button><button class="sm sec" onclick="histC('${c.id}')">Historial</button><button class="sm sec" onclick="editC('${c.id}')">Editar</button></div></div>`}).join(''):'<p class="mu">Registra aquí deudas, pagos a tu mamá, mensualidades, tarjetas y todo lo que debes pagar.</p>')}
+function editC(id){const c=S.commitments.find(x=>x.id===id)||{status:'activo',freq:'mensual',category:CATS[0],start:today()};
+ sheet(id?'Editar compromiso':'Nuevo compromiso',inp('cn','Nombre',c.name||'')+sel('cc','Categoría',CATS.map(x=>[x,x]),c.category)+sel('cf','Frecuencia',FREQ,c.freq)+nm('ca','Valor de cada pago ($)',c.amount||'')+inp('cs','Fecha de inicio',c.start,'date')+inp('ce','Fecha de término (vacía si no tiene)',c.end||'','date')+nm('ck','Cantidad de cuotas (solo «Cuotas mensuales»)',c.installments||'')+nm('ct','Monto total de la deuda (opcional)',c.total==null?'':c.total)+nm('cb','Saldo pendiente actual (opcional)',c.balance0==null?'':c.balance0)+sel('cx','Estado',STAT,c.status)+inp('co','Observaciones',c.notes||'')+(id?`<button class="dg" onclick="delC('${id}')">Eliminar compromiso y sus pagos</button>`:''),()=>{
+  const n={id:id||uid(),name:gv('cn').trim(),category:gv('cc'),freq:gv('cf'),amount:gn('ca'),start:gv('cs'),end:gv('ce')||'',installments:gn('ck'),total:gv('ct')===''?null:gn('ct'),balance0:gv('cb')===''?null:gn('cb'),status:gv('cx'),notes:gv('co')};
+  if(!n.name||!n.amount||!n.start)return toast('Completa nombre, valor y fecha de inicio'),false;
+  if(n.end&&n.end<n.start)return toast('El término no puede ser anterior al inicio'),false;
+  if(n.freq==='cuotas'){if(!n.installments)return toast('Indica la cantidad de cuotas'),false;if(n.total===null)n.total=n.installments*n.amount;n.end=C.schedule(n,'9999-12-31').pop()}
+  if(n.freq==='unico'){n.end=n.start;if(n.total===null)n.total=n.amount}if(n.freq==='permanente')n.end='';
+  const i=S.commitments.findIndex(x=>x.id===id);if(i>=0)S.commitments[i]=n;else S.commitments.push(n);save();render();toast('Compromiso guardado')})}
+function delC(id){if(confirm('¿Eliminar el compromiso y todo su historial de pagos?')){S.commitments=S.commitments.filter(c=>c.id!==id);S.payments=S.payments.filter(p=>p.cid!==id);save();closeSheet();render()}}
+function payC(id){const c=S.commitments.find(x=>x.id===id),t=today(),ps=C.paidSet(S,id),opts=C.schedule(c,C.addDays(t,45)).filter(d=>!ps.has(d)).slice(-24).map(d=>[d,'Cuota del '+C.fmtDate(d)]);
+ sheet('Registrar pago · '+esc(c.name),sel('pk','¿Qué estás pagando?',[...opts,['','Abono extraordinario / pago parcial']],opts[0]?opts[0][0]:'')+inp('pd','Fecha del pago',t,'date')+nm('pm','Monto pagado ($)',c.amount),()=>{
+  const r=C.pay(S,{cid:id,date:gv('pd'),amount:gn('pm'),occ:gv('pk')||null});if(r.error)return toast(r.error),false;save();render();toast('Pago registrado')},'Registrar pago')}
+function histC(id){const c=S.commitments.find(x=>x.id===id),l=S.payments.filter(p=>p.cid===id).sort((a,b)=>b.date.localeCompare(a.date));
+ sheet('Pagos · '+esc(c.name),l.length?l.map(p=>`<div class="li"><div>${C.fmtDate(p.date)}<br><span class="mu">${p.occ?'Cuota del '+C.fmtDate(p.occ):'Abono extraordinario'}</span></div><div><b>${money(p.amount)}</b><br><a onclick="delP('${p.id}','${id}')" style="color:#c8372d;font-size:13px">Anular</a></div></div>`).join('')+`<p class="mu">Total pagado: ${money(C.paidSum(S,id))}</p>`:'<p class="mu">Todavía no hay pagos registrados.</p>')}
+function delP(pid,cid){if(!confirm('¿Anular este pago? El saldo y las cuotas se recalculan.'))return;S.payments=S.payments.filter(p=>p.id!==pid);const c=S.commitments.find(x=>x.id===cid);if(c.status==='finalizado'&&(C.balance(S,c)||0)>0)c.status='activo';save();closeSheet();render()}
+// ---- Plan ----
+function plan(){const t=today(),ym=C.ymOf(t);return `<h1>Plan a 12 meses</h1><p class="mu">Toca un mes para editar ingreso, combustible, arriendo y otros gastos. Los compromisos se calculan solos según su vigencia.</p>`+[...Array(12)].map((_,i)=>{const m=C.addYm(ym,i),p=C.projection(S,m,t);
+ return `<div class="c" style="margin-bottom:10px" onclick="editP('${m}')"><div class="li" style="border:0;padding:0"><b style="text-transform:capitalize;font-size:17px">${C.ymLabel(m)}</b><b class="${p.avail<0?'neg':'pos'}">${money(p.avail)}</b></div>
+ <div class="mu">Ingreso ${money(p.income)} · Gastos ${money(p.expenses)} · Compromisos ${money(p.commitments)}</div>${p.real.n?`<div class="mu">Real: ingreso ${money(p.real.gross)} (${p.diffIncome>=0?'+':''}${money(p.diffIncome)}) · gastos ${money(p.real.costs+p.real.rent)} (${p.diffExpenses>=0?'+':''}${money(p.diffExpenses)})</div>`:''}</div>`}).join('')}
+function editP(m){const p=C.projection(S,m,today());
+ sheet(C.ymLabel(m),nm('pi','Ingreso esperado',p.income||'')+nm('pf','Combustible',p.fuel||'')+nm('pr','Arriendo',p.rent||'')+nm('po','Otros gastos',p.other||'')+`<div class="c"><small>Compromisos del mes (automático)</small>${p.items.length?p.items.map(i=>`<div class="li"><span>${esc(i.c.name)} · ${C.fmtDate(i.date)}</span><b>${money(i.amount)}</b></div>`).join(''):'<br><span class="mu">Ninguno vigente este mes.</span>'}<div class="li"><b>Total</b><b>${money(p.commitments)}</b></div></div><p class="mu">Saldo disponible: ${money(p.avail)} · Podrías ahorrar: ${money(p.savings)}</p>`,()=>{S.plan[m]={income:gn('pi'),fuel:gn('pf'),rent:gn('pr'),other:gn('po')};save();render()})}
+// ---- Más: calendario, metas, respaldo ----
+function mas(){if(ui.sub==='cal')return cal();if(ui.sub==='goals')return goals();if(ui.sub==='bk')return backup();
+ return `<h1>Más</h1><div class="c"><div class="li" onclick="go('mas','cal')"><b>Calendario financiero</b><span>›</span></div><div class="li" onclick="go('mas','goals')"><b>Metas de ahorro</b><span>›</span></div><div class="li" onclick="go('mas','bk')"><b>Respaldo y ajustes</b><span>›</span></div></div>`}
+const back=`<button class="sec sm" onclick="go('mas')" style="margin-bottom:10px">‹ Volver</button>`;
+function cal(){const ym=ui.cal,[a,b]=C.monthRange(ym),ev=C.events(S,a,b),off=(new Date(a+'T12:00:00').getDay()+6)%7,n=C.dim(+ym.slice(0,4),+ym.slice(5)-1),col={pago:'#f5a623',inicio:'#12805c',fin:'#c8372d'};
+ let h=back+`<div class="row" style="margin:0 0 10px"><button class="sec sm" onclick="ui.cal=C.addYm(ui.cal,-1);render()">‹</button><b style="text-align:center;text-transform:capitalize;padding-top:8px">${C.ymLabel(ym)}</b><button class="sec sm" onclick="ui.cal=C.addYm(ui.cal,1);render()">›</button></div><div class="cal">`+'LMMJVSD'.split('').map(x=>`<div class="h">${x}</div>`).join('')+'<div style="background:none"></div>'.repeat(off);
+ for(let d=1;d<=n;d++){const k=ym+'-'+String(d).padStart(2,'0');h+=`<div class="${k===ui.day?'sel':''} ${k===today()?'td':''}" onclick="ui.day='${k}';render()">${d}<br>${ev.filter(e=>e.date===k).map(e=>`<span class="dt" style="background:${col[e.type]}"></span>`).join('')}</div>`}
+ const de=ev.filter(e=>e.date===ui.day);return h+`</div><p class="mu"><span class="dt" style="background:#f5a623"></span> pago <span class="dt" style="background:#12805c"></span> inicio <span class="dt" style="background:#c8372d"></span> término</p><h2>${C.fmtDate(ui.day)}</h2><div class="c">${de.length?de.map(e=>`<div class="li"><div>${esc(e.c.name)}<br><span class="mu">${e.type==='pago'?'Pago programado':e.type==='inicio'?'Inicio del compromiso':'Término del compromiso'}</span></div><div>${e.type==='pago'?money(e.c.amount)+(e.paid?'<br><span class="tag o">pagado</span>':''):''}</div></div>`).join(''):'<span class="mu">Sin eventos este día.</span>'}</div>`}
+function goals(){return back+`<h1>Metas</h1><button class="amb" style="width:100%" onclick="editG()">+ Nueva meta</button><div style="height:12px"></div>`+(S.goals.length?S.goals.map(g=>{const p=g.target?Math.min(100,g.saved/g.target*100):0;return `<div class="c" style="margin-bottom:10px"><div class="li" style="border:0;padding:0"><b style="font-size:17px">${esc(g.name)}</b><b>${money(g.target)}</b></div><div class="bar"><i style="width:${p}%"></i></div><div class="mu">Llevas ${money(g.saved)} · te faltan <b>${money(Math.max(0,g.target-g.saved))}</b></div><div class="row"><button class="sm" onclick="addG('${g.id}')">Abonar</button><button class="sm sec" onclick="editG('${g.id}')">Editar</button></div></div>`}).join(''):'<p class="mu">Crea metas como un computador, una capacitación o una licencia profesional.</p>')}
+function editG(id){const g=S.goals.find(x=>x.id===id)||{name:'',target:'',saved:0};sheet(id?'Editar meta':'Nueva meta',inp('gn','Nombre de la meta',g.name)+nm('gt','Monto necesario',g.target)+nm('gs','Ahorrado hasta ahora',g.saved||'')+(id?`<button class="dg" onclick="if(confirm('¿Eliminar meta? El dinero ahorrado vuelve a quedar disponible.')){S.goals=S.goals.filter(x=>x.id!=='${id}');save();closeSheet();render()}">Eliminar meta</button>`:''),()=>{if(!gv('gn').trim()||!gn('gt'))return toast('Indica nombre y monto'),false;const n={id:id||uid(),name:gv('gn').trim(),target:gn('gt'),saved:gn('gs')};const i=S.goals.findIndex(x=>x.id===id);if(i>=0)S.goals[i]=n;else S.goals.push(n);save();render()})}
+function addG(id){const g=S.goals.find(x=>x.id===id);sheet('Abonar a '+esc(g.name),nm('ga','Monto a abonar ($)',''),()=>{const a=gn('ga');if(!a)return toast('Ingresa un monto'),false;g.saved+=a;save();render();toast('Abono registrado')})}
+function backup(){const dd=S.lastBackup?C.fmtDate(S.lastBackup):'nunca';return back+`<h1>Respaldo y ajustes</h1><div class="c"><b>Último respaldo: ${dd}</b><p class="mu">Tus datos viven solo en este teléfono. Exporta un respaldo cada semana y guárdalo en Archivos o iCloud.</p><div class="row"><button onclick="exp()">Exportar respaldo</button><button class="sec" onclick="$('#imp').click()">Importar</button></div><input id="imp" type="file" accept="application/json,.json" hidden onchange="imp(this)"></div>
+ <h2>Saldo inicial</h2><div class="c">${nm('so','Dinero con el que partes hoy ($)',S.opening||'')}<button class="sec" onclick="S.opening=gn('so');save();toast('Saldo guardado');render()">Guardar saldo</button></div>
+ <h2>Zona de peligro</h2><button class="dg" style="width:100%" onclick="wipe()">Borrar todos los datos</button>`}
+function exp(){const b=new Blob([JSON.stringify({app:'mi-control',v:2,fecha:new Date().toISOString(),state:S},null,1)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='respaldo-mi-control-'+today()+'.json';document.body.appendChild(a);a.click();a.remove();S.lastBackup=today();save();setTimeout(render,300);toast('Respaldo exportado')}
+async function imp(el){try{const f=el.files[0];if(!f)return;const d=JSON.parse(await f.text());let ns;if(Array.isArray(d))ns=normalize({entries:fromLegacy(d)});else if(d.app==='mi-control'&&d.state)ns=normalize(d.state);else throw 0;
+ if(!confirm('Esto reemplaza TODOS los datos actuales por el respaldo ('+ns.entries.length+' jornadas, '+ns.commitments.length+' compromisos). ¿Continuar?'))return;S=ns;await save();render();toast('Respaldo importado')}catch(e){toast('Ese archivo no es un respaldo válido')}el.value=''}
+function wipe(){if(confirm('¿Borrar TODOS los datos? Exporta un respaldo antes.')&&confirm('Última confirmación: no se puede deshacer.')){S=normalize({});save();render()}}
+// ---- Render ----
+const TABS=[['home','Inicio'],['ing','Ingresos'],['deu','Compromisos'],['plan','Plan'],['mas','Más']];
+function render(){$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${ui.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
+ $('#app').innerHTML={home,ing:ingresos,deu:deudas,plan,mas}[ui.tab]()}
+(async()=>{try{const d=await kvGet('state');if(d)S=normalize(d);else{const old=localStorage.getItem('mi-control-uber-v1');if(old){const a=JSON.parse(old);if(Array.isArray(a)&&a.length){S.entries=fromLegacy(a);save()}}}}catch(e){toast('No se pudo leer el almacenamiento')}
+ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();render();
+ if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})})();
+</script></body></html>
